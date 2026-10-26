@@ -4,7 +4,7 @@
 # Squelette — a completer quand continuum-keycloak-spi produit son jar.
 # La version DOIT correspondre a <keycloak.version> de ../continuum-keycloak-spi/pom.xml.
 
-ARG KEYCLOAK_VERSION=26.0.7
+ARG KEYCLOAK_VERSION=26.3.0
 FROM quay.io/keycloak/keycloak:${KEYCLOAK_VERSION}
 
 # SPI maison (AuthenticationFlow, mappers, event listeners…)
