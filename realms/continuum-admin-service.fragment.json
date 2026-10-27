@@ -20,12 +20,11 @@
     "realm": [
       {
         "name": "continuum-user-admin",
-        "description": "D40: reset MFA credentials and close sessions of users (admin REST). Composite of the minimal realm-management roles.",
+        "description": "D40: reset MFA credentials and close sessions of users (admin REST). Composite of manage-users only (manage-users implies view access to the user endpoints).",
         "composite": true,
         "composites": {
           "client": {
             "realm-management": [
-              "view-users",
               "manage-users"
             ]
           }
