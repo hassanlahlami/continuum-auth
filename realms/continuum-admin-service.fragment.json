@@ -1,0 +1,54 @@
+{
+  "_comment": "D40: service client used by the backend (reset-mfa, close-sessions) through the Keycloak admin REST API. Merge into the realm export (clients[] + users[]); secret comes from env KC_ADMIN_SERVICE_SECRET, never committed.",
+  "clients": [
+    {
+      "clientId": "continuum-admin-service",
+      "name": "Continuum backend admin service",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${KC_ADMIN_SERVICE_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "fullScopeAllowed": false
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "continuum-user-admin",
+        "description": "D40: reset MFA credentials and close sessions of users (admin REST). Composite of the minimal realm-management roles.",
+        "composite": true,
+        "composites": {
+          "client": {
+            "realm-management": [
+              "view-users",
+              "manage-users"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "service-account-continuum-admin-service",
+      "enabled": true,
+      "serviceAccountClientId": "continuum-admin-service",
+      "realmRoles": [
+        "continuum-user-admin"
+      ]
+    }
+  ],
+  "scopeMappings": [
+    {
+      "client": "continuum-admin-service",
+      "roles": [
+        "continuum-user-admin"
+      ]
+    }
+  ]
+}
