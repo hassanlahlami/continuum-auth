@@ -41,3 +41,5 @@ Usage backend (token via `POST /realms/{realm}/protocol/openid-connect/token`) :
 - close-sessions : `POST /admin/realms/{realm}/users/{id}/logout`.
 L'état verrouillé/désactivé est lu côté backend (`platform.user_account`) via `getAccountLoginStatus`
 (motif `ACCOUNT_DISABLED`) ; le SPI relaie tout `reason` reçu sans logique métier.
+
+Note: the fragment also carries `scopeMappings` (client `continuum-admin-service` -> role `continuum-user-admin`); without it `fullScopeAllowed:false` strips realm-management roles from the token and every admin call returns 403. Verified on Keycloak 26.3.0: credentials list 200, users/{id}/logout 204. Keycloak user id = `user_account.id` must equal the Keycloak user UUID (look up by username otherwise).

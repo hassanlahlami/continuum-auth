@@ -22,7 +22,14 @@
         "name": "continuum-user-admin",
         "description": "D40: reset MFA credentials and close sessions of users (admin REST). Composite of the minimal realm-management roles.",
         "composite": true,
-        "composites": { "client": { "realm-management": ["view-users", "manage-users"] } }
+        "composites": {
+          "client": {
+            "realm-management": [
+              "view-users",
+              "manage-users"
+            ]
+          }
+        }
       }
     ]
   },
@@ -31,7 +38,17 @@
       "username": "service-account-continuum-admin-service",
       "enabled": true,
       "serviceAccountClientId": "continuum-admin-service",
-      "realmRoles": ["continuum-user-admin"]
+      "realmRoles": [
+        "continuum-user-admin"
+      ]
+    }
+  ],
+  "scopeMappings": [
+    {
+      "client": "continuum-admin-service",
+      "roles": [
+        "continuum-user-admin"
+      ]
     }
   ]
 }
