@@ -1,0 +1,54 @@
+{
+  "_comment": "Directory sync service client used by the backend scheduled job (admin REST user-storage/{id}/sync). Merge into the realm export (clients[] + roles + users[] + scopeMappings); secret comes from env KC_DIRECTORY_SYNC_SECRET, never committed.",
+  "clients": [
+    {
+      "clientId": "continuum-directory-sync",
+      "name": "Continuum backend directory sync",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${KC_DIRECTORY_SYNC_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "fullScopeAllowed": false
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "continuum-directory-sync",
+        "description": "Trigger user-federation sync (POST user-storage/{id}/sync) and resolve the LDAP component by name. Composite of manage-users (required by the sync endpoint) + view-realm (required to list components by name) only; no manage-realm, no clients access.",
+        "composite": true,
+        "composites": {
+          "client": {
+            "realm-management": [
+              "manage-users",
+              "view-realm"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "service-account-continuum-directory-sync",
+      "enabled": true,
+      "serviceAccountClientId": "continuum-directory-sync",
+      "realmRoles": [
+        "continuum-directory-sync"
+      ]
+    }
+  ],
+  "scopeMappings": [
+    {
+      "client": "continuum-directory-sync",
+      "roles": [
+        "continuum-directory-sync"
+      ]
+    }
+  ]
+}

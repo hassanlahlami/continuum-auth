@@ -43,3 +43,21 @@ L'état verrouillé/désactivé est lu côté backend (`platform.user_account`) 
 (motif `ACCOUNT_DISABLED`) ; le SPI relaie tout `reason` reçu sans logique métier.
 
 Note: the fragment also carries `scopeMappings` (client `continuum-admin-service` -> role `continuum-user-admin`); without it `fullScopeAllowed:false` strips realm-management roles from the token and every admin call returns 403. Verified on Keycloak 26.3.0 with manage-users only: username lookup 200, credentials list 200, otp credential DELETE 204, users/{id}/logout 204. Keycloak user id = `user_account.id` must equal the Keycloak user UUID (look up by username otherwise).
+
+## Client de synchronisation annuaire
+
+`realms/continuum-directory-sync.fragment.json` : client confidentiel `continuum-directory-sync`
+(client_credentials uniquement, secret via `KC_DIRECTORY_SYNC_SECRET`), compte de service porteur du rôle
+realm `continuum-directory-sync` (composite `realm-management` : `manage-users` + `view-realm`, avec
+`scopeMappings` obligatoire car `fullScopeAllowed:false`). Séparé de `continuum-admin-service` (moindre privilège).
+Usage backend (job planifié) :
+- résolution du composant par nom : `GET /admin/realms/{realm}/components?type=org.keycloak.storage.UserStorageProvider&name={source_code}`
+  (`view-realm` requis, sinon 403) ; `source_code` (`directory_sync_state`) = **nom du composant LDAP** (sim : `ad-banque`) ;
+- synchro : `POST /admin/realms/{realm}/user-storage/{id}/sync?action=triggerChangedUsersSync|triggerFullSync`
+  (`manage-users` requis) → JSON `{added,updated,removed,failed,status}`.
+
+Vérifié (Keycloak 26.3.0 sim + Samba AD, `./sim.ps1 init-ad`) : lookup par nom 200 ; `triggerChangedUsersSync` 200 ;
+`triggerFullSync` 200 (`updated:6`, `failed:2` = utilisateurs locaux `ig.demo`/`dsi.admin` créés par `setup-demo.sh`,
+non liés à la fédération : attendu) ; `PUT /admin/realms/{realm}` 403 et `GET …/clients` 403 (pas de sur-privilège).
+Sans `view-realm` : lookup par nom 403 (alternative : fournir l'id du composant par configuration).
+Secret de sim : `KC_DIRECTORY_SYNC_SECRET=dev-only-directory-sync-secret` (non committé en prod).
