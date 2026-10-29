@@ -30,3 +30,6 @@ apps/*-e2e/cypress/downloads/
 *.iml
 .DS_Store
 Thumbs.db
+
+# recette local secrets
+recette/.env.local
