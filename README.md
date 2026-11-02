@@ -61,3 +61,24 @@ Vérifié (Keycloak 26.3.0 sim + Samba AD, `./sim.ps1 init-ad`) : lookup par nom
 non liés à la fédération : attendu) ; `PUT /admin/realms/{realm}` 403 et `GET …/clients` 403 (pas de sur-privilège).
 Sans `view-realm` : lookup par nom 403 (alternative : fournir l'id du composant par configuration).
 Secret de sim : `KC_DIRECTORY_SYNC_SECRET=dev-only-directory-sync-secret` (non committé en prod).
+
+## Spike ADR 0014 / D41 — direct grant + OTP et `acr` (2026-11-02, Keycloak 26.3)
+
+`recette/spike-d41-direct-grant-acr.sh` (realm jetable `spike-d41`, aucun realm partagé modifié). Résultat : **non**,
+un client confidentiel en *direct grant* + OTP **n'obtient jamais `acr` ≥ 2** en configuration native :
+- flux direct grant à conditions *Level of Authentication* (LoA1 mot de passe, LoA2 OTP, `acr.loa.map` `{"1":1,"2":2}`),
+  avec `acr_values=2`, `claims` `acr` essentiel, ou `default.acr.values`/`minimum.acr.value` = 2 sur le client → toujours `acr=1` ;
+  **danger** : dans ce flux les sous-flux conditionnels sont ignorés en direct grant → jeton délivré avec **mot de passe faux**
+  et OTP faux. Ne jamais mettre `conditional-level-of-authentication` dans un flux direct grant ;
+- flux direct grant à OTP **toujours requis** : OTP bien exigé (sans OTP / OTP faux → `invalid_grant`), mais `acr=1` ;
+- « OTP manquant » et « mot de passe faux » renvoient la même erreur (`invalid_grant`, *Invalid user credentials*) : le BFF ne peut
+  pas en déduire qu'un défi OTP est nécessaire (il doit le savoir autrement, ex. credentials via `continuum-admin-service`).
+Pistes pour `acr` ≥ 2 en REST : (a) mapper `acr` codé en dur sur un client dont le flux impose l'OTP (acr « par construction »,
+fragile : une dérive de config produit un faux `acr`) ; (b) authenticator SPI qui positionne le LoA après OTP réussi ⟨à prototyper⟩.
+Sans cela, `/api/admin/**` et signatures restent en redirection (voie C).
+
+`realms/continuum-auth-bff.fragment.json` (**brouillon**, non fusionné dans un export de realm) : client confidentiel
+`continuum-auth-bff`, *direct grant* seul (pas de flux navigateur, pas de compte de service), secret `KC_AUTH_BFF_SECRET`,
+scopes `basic`/`acr`/`profile`/`email`, mappers `tenant_id`/`continuum_user_id`, aucun mapper `acr` codé en dur ; flux direct grant
+intégré du realm (OTP exigé si l'utilisateur en a un). Vérifié par `recette/verify-auth-bff-fragment.sh` (realm jetable `spike-d41-bff`).
+Mapper d'audience à convenir avec backend ⟨à valider⟩.
