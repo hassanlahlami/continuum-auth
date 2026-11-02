@@ -1,0 +1,61 @@
+{
+  "_comment": "DRAFT (ADR 0014 / D41, not ratified) - confidential client used ONLY by the backend auth BFF (/api/auth/*) for the Resource Owner Password grant. directAccessGrantsEnabled is true on this client only; no browser flow, no service account. Uses the realm's built-in 'direct grant' flow (username, password, OTP required only when the user has an OTP credential). Does NOT carry an acr>=2 claim: spike 2026-11-02 (recette/spike-d41-direct-grant-acr.sh) shows Keycloak 26.3 always emits acr=1 on direct grant, so /api/admin/** and signatures stay on the redirect flow. No hardcoded acr mapper on purpose. Merge into the realm export (clients[]); secret from env KC_AUTH_BFF_SECRET, never committed. Audience mapper to be agreed with backend.",
+  "clients": [
+    {
+      "clientId": "continuum-auth-bff",
+      "name": "Continuum - auth BFF (backend, direct grant)",
+      "description": "ADR 0014 / D41 draft. Server-side only (backend BFF); tokens never reach the browser.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${KC_AUTH_BFF_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": false,
+      "fullScopeAllowed": false,
+      "redirectUris": [],
+      "webOrigins": [],
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [],
+      "attributes": {
+        "client.session.idle.timeout": "900",
+        "access.token.lifespan": "300",
+        "use.refresh.tokens": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "tenant_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "tenant_id",
+            "claim.name": "tenant_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "continuum_user_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "continuum_user_id",
+            "claim.name": "continuum_user_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ]
+}
