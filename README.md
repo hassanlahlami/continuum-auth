@@ -61,3 +61,16 @@ Vérifié (Keycloak 26.3.0 sim + Samba AD, `./sim.ps1 init-ad`) : lookup par nom
 non liés à la fédération : attendu) ; `PUT /admin/realms/{realm}` 403 et `GET …/clients` 403 (pas de sur-privilège).
 Sans `view-realm` : lookup par nom 403 (alternative : fournir l'id du composant par configuration).
 Secret de sim : `KC_DIRECTORY_SYNC_SECRET=dev-only-directory-sync-secret` (non committé en prod).
+
+## Recette : rôles des clients de service du backend
+
+`recette/setup-recette-backend-roles.sh` (idempotent, `KC_ADMIN_PASSWORD` requis) provisionne dans le realm
+`recette` exactement les deux fragments ci-dessus : `continuum-admin-service` (`continuum-user-admin` = {manage-users})
+et `continuum-directory-sync` (`continuum-directory-sync` = {manage-users, view-realm}), confidentiels,
+client_credentials seul, `fullScopeAllowed:false` + scope mapping. Il supprime l'ancien client lecture seule
+`continuum-backend` (remplacé, validé par le tech-lead le 2026-11-02). Les secrets vont dans `recette/.env.local`
+(non versionné) ; `KC_DIRECTORY_SYNC_SECRET` et `CONTINUUM_DIRECTORY_SYNC_CLIENT_SECRET` y reçoivent la même valeur.
+Côté backend : `CONTINUUM_KC_ADMIN_BASE_URL` (vide = 503), `CONTINUUM_KC_ADMIN_REALM=recette`,
+`CONTINUUM_DIRECTORY_SYNC_CLIENT_ID=continuum-directory-sync` (+ `..._ENABLED`/`..._SOURCE` si la synchro doit tourner).
+Contrôles en direct : `recette/verify-recette-backend-roles.sh` (rôles du jeton, lookup/credentials/logout,
+components, manage-realm et liste des clients refusés en 403).
