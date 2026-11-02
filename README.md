@@ -77,8 +77,33 @@ Pistes pour `acr` ≥ 2 en REST : (a) mapper `acr` codé en dur sur un client do
 fragile : une dérive de config produit un faux `acr`) ; (b) authenticator SPI qui positionne le LoA après OTP réussi ⟨à prototyper⟩.
 Sans cela, `/api/admin/**` et signatures restent en redirection (voie C).
 
-`realms/continuum-auth-bff.fragment.json` (**brouillon**, non fusionné dans un export de realm) : client confidentiel
-`continuum-auth-bff`, *direct grant* seul (pas de flux navigateur, pas de compte de service), secret `KC_AUTH_BFF_SECRET`,
-scopes `basic`/`acr`/`profile`/`email`, mappers `tenant_id`/`continuum_user_id`, aucun mapper `acr` codé en dur ; flux direct grant
-intégré du realm (OTP exigé si l'utilisateur en a un). Vérifié par `recette/verify-auth-bff-fragment.sh` (realm jetable `spike-d41-bff`).
-Mapper d'audience à convenir avec backend ⟨à valider⟩.
+## Clients BFF ADR 0014 / D41 (acceptée 2026-11-02)
+
+`realms/continuum-auth-bff.fragment.json` : un client **confidentiel par front**, utilisé **uniquement** par le BFF backend
+(`/api/auth/*`) ; les jetons ne quittent jamais le serveur. Aucun mapper `acr` codé en dur ; `acr` réel via le scope `acr`.
+
+| | `continuum-app-bff` | `continuum-admin-bff` |
+|---|---|---|
+| Secret (env, jamais committé) | `KC_APP_BFF_SECRET` | `KC_ADMIN_BFF_SECRET` |
+| Propriétés backend | `continuum.auth.bff.app.client-id/secret` | `continuum.auth.bff.admin.client-id/secret` |
+| *Direct grant* (login REST) | oui (flux `direct grant` du realm, OTP si l'utilisateur en a un, `acr=1`) | **non** (`unauthorized_client`) |
+| Code + PKCE S256 (repli, SSO, step-up) | oui | oui (seul flux) |
+| Callback (même origine, sim) | `http://localhost:4200/api/auth/callback`, `:4203` | `http://localhost:4201/api/auth/callback`, `:4202` |
+| `acr` | 1 ; `acr_values=2` → OTP → 2 | toujours 2 (`default.acr.values`/`minimum.acr.value` = 2) |
+| Audience | `continuum-app` | `continuum-admin` |
+
+Mappers communs : `tenant_id`, `continuum_user_id` ; scopes `basic`/`acr`/`profile`/`email`, `fullScopeAllowed:false` (pas de rôles).
+Flux navigateur `continuum-browser-loa` (surcharge par client, les bindings du realm ne changent pas) : cookie OU
+[LoA1 mot de passe | LoA2 OTP] ; `loa-max-age` 36000 s (LoA1) / 300 s (LoA2) = valeurs techniques ⟨à valider⟩ avec le pack.
+Les origines de prod viennent du déploiement (le fragment ne porte que celles de la simulation).
+
+**Fusion dans un export de realm** : `python -I realms/merge-fragments.py REALM.json realms/<fragment>.json… [-o OUT]`
+(idempotent, remplace par clé naturelle `clientId`/`alias`/`username`/`name`/`client`, conserve UTF-8, indentation 2 et fins de ligne).
+Vérifié : re-fusionner `continuum-admin-service` + `continuum-directory-sync` dans `banque-demo-realm.json` → fichier identique octet pour octet.
+
+**Vérification** : `python -I recette/verify-auth-bff-fragment.py [REALM.json]` importe `banque-demo-realm.json` **fusionné**
+avec le fragment dans un realm jetable `verify-d41-bff` (Keycloak sim local) et pilote les vraies pages de login :
+direct grant (OTP exigé/refusé, claims, `acr=1`), Code+PKCE (sans PKCE refusé, `code_verifier`/secret faux refusés,
+redirect_uri inconnue 400, rejeu du code refusé), step-up `acr_values=2` dans la même session → OTP seul → `acr=2`,
+admin : direct grant refusé, mot de passe + OTP → `acr=2`/aud `continuum-admin`, utilisateur sans OTP → page d'enrôlement TOTP.
+2026-11-02, Keycloak 26.3 : **37/37 OK**. Mot de passe admin du Keycloak : `KC_ADMIN_PASSWORD`.
