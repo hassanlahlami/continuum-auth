@@ -1,22 +1,25 @@
 {
-  "_comment": "DRAFT (ADR 0014 / D41, not ratified) - confidential client used ONLY by the backend auth BFF (/api/auth/*) for the Resource Owner Password grant. directAccessGrantsEnabled is true on this client only; no browser flow, no service account. Uses the realm's built-in 'direct grant' flow (username, password, OTP required only when the user has an OTP credential). Does NOT carry an acr>=2 claim: spike 2026-11-02 (recette/spike-d41-direct-grant-acr.sh) shows Keycloak 26.3 always emits acr=1 on direct grant, so /api/admin/** and signatures stay on the redirect flow. No hardcoded acr mapper on purpose. Merge into the realm export (clients[]); secret from env KC_AUTH_BFF_SECRET, never committed. Audience mapper to be agreed with backend.",
+  "_comment": "ADR 0014 / D41 (accepted 2026-11-02). Confidential clients used ONLY by the backend auth BFF (/api/auth/*), one per front; tokens never reach the browser. continuum-app-bff: direct grant (REST login, realm 'direct grant' flow, OTP only if the user has one, acr always 1) + Code+PKCE S256 terminated by the BFF callback. continuum-admin-bff: Code+PKCE ONLY (admin is redirect-only, acr>=2 cannot be obtained by direct grant, see recette/spike-d41-direct-grant-acr.sh) with minimum/default acr 2. Both use the browser flow override continuum-browser-loa (step-up: acr_values=2 -> OTP; LoA max ages are technical defaults, to validate against the pack). No hardcoded acr mapper. Merge with realms/merge-fragments.py (clients[] + authenticationFlows[] + authenticatorConfig[]); secrets from env KC_APP_BFF_SECRET / KC_ADMIN_BFF_SECRET, never committed. Callback: <front origin>/api/auth/callback (same origin, ADR 0014 addendum); sim origins below, prod origins come from the deployment.",
   "clients": [
     {
-      "clientId": "continuum-auth-bff",
-      "name": "Continuum - auth BFF (backend, direct grant)",
-      "description": "ADR 0014 / D41 draft. Server-side only (backend BFF); tokens never reach the browser.",
+      "clientId": "continuum-app-bff",
+      "name": "Continuum - auth BFF, functional app",
+      "description": "ADR 0014 / D41. Server-side only (backend BFF). Direct grant + Code+PKCE (redirect fallback, SSO, step-up).",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "${KC_AUTH_BFF_SECRET}",
-      "standardFlowEnabled": false,
+      "secret": "${KC_APP_BFF_SECRET}",
+      "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
       "frontchannelLogout": false,
       "fullScopeAllowed": false,
-      "redirectUris": [],
+      "redirectUris": [
+        "http://localhost:4200/api/auth/callback",
+        "http://localhost:4203/api/auth/callback"
+      ],
       "webOrigins": [],
       "defaultClientScopes": [
         "basic",
@@ -25,12 +28,27 @@
         "email"
       ],
       "optionalClientScopes": [],
+      "authenticationFlowBindingOverrides": {
+        "browser": "6d8a3c1e-4f2b-4c7a-9e51-0b7d2a1f4c01"
+      },
       "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "acr.loa.map": "{\"1\":1,\"2\":2}",
         "client.session.idle.timeout": "900",
         "access.token.lifespan": "300",
         "use.refresh.tokens": "true"
       },
       "protocolMappers": [
+        {
+          "name": "aud-continuum-app",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "continuum-app",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
         {
           "name": "tenant_id",
           "protocol": "openid-connect",
@@ -56,6 +74,195 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "continuum-admin-bff",
+      "name": "Continuum - auth BFF, system admin",
+      "description": "ADR 0014 / D41. Server-side only (backend BFF). Code+PKCE only, every login at acr 2 (OTP).",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${KC_ADMIN_BFF_SECRET}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": false,
+      "fullScopeAllowed": false,
+      "redirectUris": [
+        "http://localhost:4201/api/auth/callback",
+        "http://localhost:4202/api/auth/callback"
+      ],
+      "webOrigins": [],
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [],
+      "authenticationFlowBindingOverrides": {
+        "browser": "6d8a3c1e-4f2b-4c7a-9e51-0b7d2a1f4c01"
+      },
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "acr.loa.map": "{\"1\":1,\"2\":2}",
+        "default.acr.values": "2",
+        "minimum.acr.value": "2",
+        "client.session.idle.timeout": "900",
+        "access.token.lifespan": "300",
+        "use.refresh.tokens": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "aud-continuum-admin",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "continuum-admin",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "tenant_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "tenant_id",
+            "claim.name": "tenant_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "continuum_user_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "continuum_user_id",
+            "claim.name": "continuum_user_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "authenticationFlows": [
+    {
+      "id": "6d8a3c1e-4f2b-4c7a-9e51-0b7d2a1f4c01",
+      "alias": "continuum-browser-loa",
+      "description": "Browser flow with step-up (LoA 1 = password, LoA 2 = OTP). Bound per client (BFF clients only).",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-cookie",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "flowAlias": "continuum-browser-loa forms",
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "id": "6d8a3c1e-4f2b-4c7a-9e51-0b7d2a1f4c02",
+      "alias": "continuum-browser-loa forms",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "flowAlias": "continuum-browser-loa level 1",
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "flowAlias": "continuum-browser-loa level 2",
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 20,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "id": "6d8a3c1e-4f2b-4c7a-9e51-0b7d2a1f4c03",
+      "alias": "continuum-browser-loa level 1",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-level-of-authentication",
+          "authenticatorConfig": "continuum-loa-1",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "auth-username-password-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "id": "6d8a3c1e-4f2b-4c7a-9e51-0b7d2a1f4c04",
+      "alias": "continuum-browser-loa level 2",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-level-of-authentication",
+          "authenticatorConfig": "continuum-loa-2",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false
+        }
+      ]
+    }
+  ],
+  "authenticatorConfig": [
+    {
+      "alias": "continuum-loa-1",
+      "config": {
+        "loa-condition-level": "1",
+        "loa-max-age": "36000"
+      }
+    },
+    {
+      "alias": "continuum-loa-2",
+      "config": {
+        "loa-condition-level": "2",
+        "loa-max-age": "300"
+      }
     }
   ]
 }

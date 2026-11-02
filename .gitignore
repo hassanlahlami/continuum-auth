@@ -33,3 +33,4 @@ Thumbs.db
 
 # recette local secrets
 recette/.env.local
+__pycache__/
