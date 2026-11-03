@@ -13,6 +13,18 @@ SPI maison (`continuum-keycloak-spi`) et les thèmes aux couleurs du tenant. Key
 - `realms/` — export(s) de realm (squelette à compléter : realm `banque-demo`, clients `continuum-app`
   et `continuum-admin`, exigence `acr ≥ 2` côté admin).
 
+## Simulation : TOTP connu pour les E2E (dév uniquement)
+
+`scripts/sim-enroll-totp.py` enrôle un TOTP pour un compte de la **simulation** (`dsi.admin` par défaut,
+realm `banque-demo` sur `localhost` uniquement — refuse tout autre hôte, jamais `recette` ni la prod) via le
+parcours navigateur standard (action requise `CONFIGURE_TOTP`), pour que Cypress puisse passer le step-up
+`acr=2` (code calculé avec otplib). Le secret est écrit dans `--out`, **hors de tout dépôt git** (vérifié),
+jamais affiché. Relancé, il vérifie seulement la connexion avec le secret déjà stocké.
+
+```bash
+SIM_USER_PASSWORD=... python -I scripts/sim-enroll-totp.py   --out ../.claude-team/secrets/admin-web-sim-dsi-admin.env [--client-secret-env KC_ADMIN_BFF_SECRET]
+```
+
 ## Construire
 
 Le jar de SPI doit être produit d'abord :
