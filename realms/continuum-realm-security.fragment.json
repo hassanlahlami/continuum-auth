@@ -1,0 +1,14 @@
+{
+  "_comment": "Realm security baseline (ADR 0014 §5, plan §4.5/§10): native brute-force detection (temporary lockout) + CONFIGURE_TOTP required action enabled (not a default action: MFA enrolment follows the tenant policy). Values = sim/pack defaults ⟨à valider⟩, same as banque-demo-realm.json; target thresholds are DB parameters. Applied to live realms by recette/setup-realm-security.py (not by merge-fragments.py: a partial requiredActions list in an import would drop Keycloak's default actions).",
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "maxDeltaTimeSeconds": 43200,
+  "quickLoginCheckMilliSeconds": 1000,
+  "minimumQuickLoginWaitSeconds": 60,
+  "requiredActions": [
+    { "alias": "CONFIGURE_TOTP", "enabled": true, "defaultAction": false }
+  ]
+}

@@ -131,3 +131,23 @@ Côté backend : `CONTINUUM_KC_ADMIN_BASE_URL` (vide = 503), `CONTINUUM_KC_ADMIN
 `CONTINUUM_DIRECTORY_SYNC_CLIENT_ID=continuum-directory-sync` (+ `..._ENABLED`/`..._SOURCE` si la synchro doit tourner).
 Contrôles en direct : `recette/verify-recette-backend-roles.sh` (rôles du jeton, lookup/credentials/logout,
 components, manage-realm et liste des clients refusés en 403).
+
+## Socle de sécurité du realm : OTP + anti-force brute (ADR 0014 §5)
+
+`realms/continuum-realm-security.fragment.json` : détection native de force brute (verrouillage **temporaire** :
+`failureFactor` 5, attente croissante 60 s → 900 s max, fenêtre 12 h, quick-login 1 s / 60 s) et action requise
+`CONFIGURE_TOTP` **activée** mais **pas action par défaut** (l'enrôlement MFA suit la politique du tenant). Valeurs
+de sim/pack ⟨à valider⟩, identiques à `banque-demo-realm.json` ; la cible = paramètres en base.
+Appliqué aux realms vivants par `recette/setup-realm-security.py` (idempotent, `--verify-only` pour contrôler) — pas
+par `merge-fragments.py` : une liste `requiredActions` partielle dans un import supprimerait les actions par défaut
+de Keycloak (l'import par défaut active déjà `CONFIGURE_TOTP`).
+
+```bash
+KC_ADMIN_PASSWORD=... python -I recette/setup-realm-security.py banque-demo recette
+```
+
+Vérification (utilisateur jetable, mot de passe aléatoire jamais affiché, supprimé en fin) : réglages du realm et de
+l'action relus ; utilisateur avec `CONFIGURE_TOTP` + bon mot de passe → 400 *Account is not fully set up* ; 4 échecs
+espacés (> quick-login) → encore actif, 5ᵉ → `attack-detection` `disabled:true` et bon mot de passe → 401
+`invalid_grant` ; verrou levé → 200. Vérifié 2026-11-03 sur Keycloak 26.3.5 jetable (realms `banque-demo` importé et
+`recette` vierge : avant application, `recette` = force brute désactivée, `failureFactor` 30).
