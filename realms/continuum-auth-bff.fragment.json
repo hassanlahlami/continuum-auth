@@ -1,5 +1,5 @@
 {
-  "_comment": "ADR 0014 / D41 (accepted 2026-11-02). Confidential clients used ONLY by the backend auth BFF (/api/auth/*), one per front; tokens never reach the browser. continuum-app-bff: direct grant (REST login, realm 'direct grant' flow, OTP only if the user has one, acr always 1) + Code+PKCE S256 terminated by the BFF callback. continuum-admin-bff: direct grant (REST login, acr always 1, tech-lead directive #4691) + Code+PKCE with minimum/default acr 2; /api/admin/** needs acr>=2, so an admin REST session gets 401 step-up-required and the BFF redirects (/api/auth/authorize|step-up?app=admin, acr_values=2 -> OTP) to the same /api/auth/callback (ADR 0014 addendum b; acr>=2 cannot be obtained by direct grant, see recette/spike-d41-direct-grant-acr.sh). Claims: aud via the audience mapper, acr via the default 'acr' client scope. Both use the browser flow override continuum-browser-loa (step-up: acr_values=2 -> OTP; LoA max ages are technical defaults, to validate against the pack). No hardcoded acr mapper. Merge with realms/merge-fragments.py (clients[] + authenticationFlows[] + authenticatorConfig[]); secrets from env KC_APP_BFF_SECRET / KC_ADMIN_BFF_SECRET, never committed. Callback: <front origin>/api/auth/callback (same origin, ADR 0014 addendum); sim origins below, prod origins come from the deployment.",
+  "_comment": "ADR 0014 / D41 (accepted 2026-11-02). Confidential clients used ONLY by the backend auth BFF (/api/auth/*), one per front; tokens never reach the browser. continuum-app-bff: direct grant (REST login, realm 'direct grant' flow, OTP only if the user has one, acr always 1) + Code+PKCE S256 terminated by the BFF callback. continuum-admin-bff: direct grant (REST login, acr always 1, tech-lead directive #4691) + Code+PKCE with minimum/default acr 2; /api/admin/** needs acr>=2, so an admin REST session gets 401 step-up-required and the BFF redirects (/api/auth/authorize|step-up?app=admin, acr_values=2 -> OTP) to the same /api/auth/callback (ADR 0014 addendum b; acr>=2 cannot be obtained by direct grant, see recette/spike-d41-direct-grant-acr.sh). Claims: aud via the audience mapper, acr via the default 'acr' client scope. Both use the browser flow override continuum-browser-loa (step-up: acr_values=2 -> OTP; LoA max ages are technical defaults, to validate against the pack). No hardcoded acr mapper. Merge with realms/merge-fragments.py (clients[] + authenticationFlows[] + authenticatorConfig[]); secrets from env KC_APP_BFF_SECRET / KC_ADMIN_BFF_SECRET, never committed. Callback: <front origin>/api/auth/callback (same origin, ADR 0014 addendum); sim origins below (+ http://localhost:8093 = backend BFF run directly in dev, #4907), prod origins come from the deployment.",
   "clients": [
     {
       "clientId": "continuum-app-bff",
@@ -18,7 +18,8 @@
       "fullScopeAllowed": false,
       "redirectUris": [
         "http://localhost:4200/api/auth/callback",
-        "http://localhost:4203/api/auth/callback"
+        "http://localhost:4203/api/auth/callback",
+        "http://localhost:8093/api/auth/callback"
       ],
       "webOrigins": [],
       "defaultClientScopes": [
@@ -92,7 +93,8 @@
       "fullScopeAllowed": false,
       "redirectUris": [
         "http://localhost:4201/api/auth/callback",
-        "http://localhost:4202/api/auth/callback"
+        "http://localhost:4202/api/auth/callback",
+        "http://localhost:8093/api/auth/callback"
       ],
       "webOrigins": [],
       "defaultClientScopes": [
