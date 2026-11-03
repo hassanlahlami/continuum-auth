@@ -108,6 +108,17 @@ redirect_uri inconnue 400, rejeu du code refusé), step-up `acr_values=2` dans l
 admin : direct grant refusé, mot de passe + OTP → `acr=2`/aud `continuum-admin`, utilisateur sans OTP → page d'enrôlement TOTP.
 2026-11-02, Keycloak 26.3 : **37/37 OK**. Mot de passe admin du Keycloak : `KC_ADMIN_PASSWORD`.
 
+**Provisionnement d'un realm vivant** (sans ré-import) : `python -I recette/setup-auth-bff-clients.py [--verify-only] REALM…`
+crée/aligne via l'API admin le flux `continuum-browser-loa` et les deux clients **exactement** comme le fragment (seule source,
+rien n'est redéclaré dans le script) ; idempotent, un flux dérivé est reconstruit. Secrets `KC_APP_BFF_SECRET` /
+`KC_ADMIN_BFF_SECRET` lus dans l'environnement, sinon `recette/.env.local`, sinon générés et ajoutés à `recette/.env.local`
+(jamais affichés). Vérifie ensuite le résultat vivant : structure = fragment, secret accepté / faux secret refusé, admin sans
+direct grant, `client_credentials` refusé, PKCE obligatoire, redirect_uri inconnue refusée et, si `VERIFY_USER`/`VERIFY_PASSWORD`
+(utilisateur sans OTP), un vrai direct grant `continuum-app-bff` (`acr=1`, aud `continuum-app`, `tenant_id`/`continuum_user_id`).
+2026-11-03, Keycloak sim `:8180` : `banque-demo` (secrets = valeurs dev de `.env.example` de la simulation, `ig.demo`) **29/29 OK** ;
+`recette` (secrets générés dans `recette/.env.local`, `dsi.admin`) **29/29 OK** ; ré-exécution sans changement ; dérive
+(OTP passé à `DISABLED`) détectée puis flux reconstruit. NB : Keycloak ignore une map d'overrides vide, un override se retire par valeur `""`.
+
 ## Recette : rôles des clients de service du backend
 
 `recette/setup-recette-backend-roles.sh` (idempotent, `KC_ADMIN_PASSWORD` requis) provisionne dans le realm
