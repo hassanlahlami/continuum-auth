@@ -233,9 +233,10 @@ s, _, _ = req("GET", AUTH + "?" + urllib.parse.urlencode({"client_id": APP, "res
            "redirect_uri": "http://evil.invalid/api/auth/callback"}))
 check(s == 400, f"unregistered redirect_uri -> {s}")
 
-print("5) continuum-admin-bff - redirect only, always acr 2")
-s, _, b = dg(ADMIN, "dsi.admin", {"otp": totp()})
-check(json.loads(b).get("error") == "unauthorized_client", f"direct grant refused ({json.loads(b).get('error')})")
+print("5) continuum-admin-bff - direct grant (acr 1, directive #4691) + Code+PKCE always acr 2")
+s, _, b = dg(ADMIN, "dsi.admin"); check(json.loads(b).get("error") == "invalid_grant", "admin DG: OTP user without OTP refused")
+s, _, b = dg(ADMIN, "dsi.admin", {"otp": totp()}); token_checks("admin DG password+OTP", b, "continuum-admin", "1", ADMIN)
+s, _, _ = dg(ADMIN, "dsi.admin", {"otp": totp()}, secret="wrong"); check(s == 401, f"admin DG wrong client secret -> {s}")
 op = browser()
 cb, page, v = code_flow(op, ADMIN, ADMIN_CB, "dsi.admin")
 check(bool(cb and cb.get("code")), "login without acr_values -> password + OTP -> code")
