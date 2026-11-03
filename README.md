@@ -107,3 +107,16 @@ direct grant (OTP exigé/refusé, claims, `acr=1`), Code+PKCE (sans PKCE refusé
 redirect_uri inconnue 400, rejeu du code refusé), step-up `acr_values=2` dans la même session → OTP seul → `acr=2`,
 admin : direct grant refusé, mot de passe + OTP → `acr=2`/aud `continuum-admin`, utilisateur sans OTP → page d'enrôlement TOTP.
 2026-11-02, Keycloak 26.3 : **37/37 OK**. Mot de passe admin du Keycloak : `KC_ADMIN_PASSWORD`.
+
+## Recette : rôles des clients de service du backend
+
+`recette/setup-recette-backend-roles.sh` (idempotent, `KC_ADMIN_PASSWORD` requis) provisionne dans le realm
+`recette` exactement les deux fragments ci-dessus : `continuum-admin-service` (`continuum-user-admin` = {manage-users})
+et `continuum-directory-sync` (`continuum-directory-sync` = {manage-users, view-realm}), confidentiels,
+client_credentials seul, `fullScopeAllowed:false` + scope mapping. Il supprime l'ancien client lecture seule
+`continuum-backend` (remplacé, validé par le tech-lead le 2026-11-02). Les secrets vont dans `recette/.env.local`
+(non versionné) ; `KC_DIRECTORY_SYNC_SECRET` et `CONTINUUM_DIRECTORY_SYNC_CLIENT_SECRET` y reçoivent la même valeur.
+Côté backend : `CONTINUUM_KC_ADMIN_BASE_URL` (vide = 503), `CONTINUUM_KC_ADMIN_REALM=recette`,
+`CONTINUUM_DIRECTORY_SYNC_CLIENT_ID=continuum-directory-sync` (+ `..._ENABLED`/`..._SOURCE` si la synchro doit tourner).
+Contrôles en direct : `recette/verify-recette-backend-roles.sh` (rôles du jeton, lookup/credentials/logout,
+components, manage-realm et liste des clients refusés en 403).
