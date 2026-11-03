@@ -10,7 +10,7 @@ else generated (secrets.token_urlsafe) and appended to recette/.env.local. Never
 names (application.yml continuum.auth.bff.apps.*.client-secret).
 
 Then checks the live result (--verify-only skips provisioning): structure == fragment, secret accepted / wrong
-secret rejected, admin BFF refuses the direct grant, authorize endpoint enforces PKCE + redirect URIs, and, if
+secret rejected, direct grant enabled/refused as in the fragment, authorize endpoint enforces PKCE + redirect URIs, and, if
 VERIFY_USER / VERIFY_PASSWORD are set (user without OTP), a real app-BFF direct grant (acr=1, aud continuum-app).
 
 Usage: KC_ADMIN_PASSWORD=... python -I recette/setup-auth-bff-clients.py [--verify-only] REALM [REALM...]

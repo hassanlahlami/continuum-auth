@@ -78,7 +78,7 @@
     {
       "clientId": "continuum-admin-bff",
       "name": "Continuum - auth BFF, system admin",
-      "description": "ADR 0014 / D41. Server-side only (backend BFF). Code+PKCE only, every login at acr 2 (OTP).",
+      "description": "ADR 0014 / D41. Server-side only (backend BFF). Direct grant (REST login, acr 1, OTP only if the user has one) + Code+PKCE at acr 2 (OTP).",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
@@ -86,7 +86,7 @@
       "secret": "${KC_ADMIN_BFF_SECRET}",
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": false,
+      "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
       "frontchannelLogout": false,
       "fullScopeAllowed": false,

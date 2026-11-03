@@ -86,8 +86,8 @@ Sans cela, `/api/admin/**` et signatures restent en redirection (voie C).
 |---|---|---|
 | Secret (env, jamais committé) | `KC_APP_BFF_SECRET` | `KC_ADMIN_BFF_SECRET` |
 | Propriétés backend | `continuum.auth.bff.app.client-id/secret` | `continuum.auth.bff.admin.client-id/secret` |
-| *Direct grant* (login REST) | oui (flux `direct grant` du realm, OTP si l'utilisateur en a un, `acr=1`) | **non** (`unauthorized_client`) |
-| Code + PKCE S256 (repli, SSO, step-up) | oui | oui (seul flux) |
+| *Direct grant* (login REST) | oui (flux `direct grant` du realm, OTP si l'utilisateur en a un, `acr=1`) | oui depuis 2026-11-03 (directive tech-lead #4691), mêmes règles, **`acr=1`** : les accès exigeant `acr` ≥ 2 passent par step-up/redirection |
+| Code + PKCE S256 (repli, SSO, step-up) | oui | oui (toujours `acr=2`) |
 | Callback (même origine, sim) | `http://localhost:4200/api/auth/callback`, `:4203` | `http://localhost:4201/api/auth/callback`, `:4202` |
 | `acr` | 1 ; `acr_values=2` → OTP → 2 | toujours 2 (`default.acr.values`/`minimum.acr.value` = 2) |
 | Audience | `continuum-app` | `continuum-admin` |
@@ -105,19 +105,19 @@ Vérifié : re-fusionner `continuum-admin-service` + `continuum-directory-sync` 
 avec le fragment dans un realm jetable `verify-d41-bff` (Keycloak sim local) et pilote les vraies pages de login :
 direct grant (OTP exigé/refusé, claims, `acr=1`), Code+PKCE (sans PKCE refusé, `code_verifier`/secret faux refusés,
 redirect_uri inconnue 400, rejeu du code refusé), step-up `acr_values=2` dans la même session → OTP seul → `acr=2`,
-admin : direct grant refusé, mot de passe + OTP → `acr=2`/aud `continuum-admin`, utilisateur sans OTP → page d'enrôlement TOTP.
+admin : direct grant (sans OTP refusé, avec OTP → `acr=1`/aud `continuum-admin`, faux secret refusé), Code+PKCE mot de passe + OTP → `acr=2`/aud `continuum-admin`, utilisateur sans OTP → page d'enrôlement TOTP.
 2026-11-02, Keycloak 26.3 : **37/37 OK**. Mot de passe admin du Keycloak : `KC_ADMIN_PASSWORD`.
 
 **Provisionnement d'un realm vivant** (sans ré-import) : `python -I recette/setup-auth-bff-clients.py [--verify-only] REALM…`
 crée/aligne via l'API admin le flux `continuum-browser-loa` et les deux clients **exactement** comme le fragment (seule source,
 rien n'est redéclaré dans le script) ; idempotent, un flux dérivé est reconstruit. Secrets `KC_APP_BFF_SECRET` /
 `KC_ADMIN_BFF_SECRET` lus dans l'environnement, sinon `recette/.env.local`, sinon générés et ajoutés à `recette/.env.local`
-(jamais affichés). Vérifie ensuite le résultat vivant : structure = fragment, secret accepté / faux secret refusé, admin sans
-direct grant, `client_credentials` refusé, PKCE obligatoire, redirect_uri inconnue refusée et, si `VERIFY_USER`/`VERIFY_PASSWORD`
+(jamais affichés). Vérifie ensuite le résultat vivant : structure = fragment, secret accepté / faux secret refusé, direct grant
+conforme au fragment, `client_credentials` refusé, PKCE obligatoire, redirect_uri inconnue refusée et, si `VERIFY_USER`/`VERIFY_PASSWORD`
 (utilisateur sans OTP), un vrai direct grant `continuum-app-bff` (`acr=1`, aud `continuum-app`, `tenant_id`/`continuum_user_id`).
 2026-11-03, Keycloak sim `:8180` : `banque-demo` (secrets = valeurs dev de `.env.example` de la simulation, `ig.demo`) **29/29 OK** ;
 `recette` (secrets générés dans `recette/.env.local`, `dsi.admin`) **29/29 OK** ; ré-exécution sans changement ; dérive
-(OTP passé à `DISABLED`) détectée puis flux reconstruit. NB : Keycloak ignore une map d'overrides vide, un override se retire par valeur `""`.
+(OTP passé à `DISABLED`) détectée puis flux reconstruit. 2026-11-03 : direct grant activé sur `continuum-admin-bff` → `recette` **29/29 OK**, vrai direct grant `dsi.admin` 200 (`acr=1`) ; fragment vérifié `verify-auth-bff-fragment.py` **ALL OK**. NB : Keycloak ignore une map d'overrides vide, un override se retire par valeur `""`.
 
 ## Recette : rôles des clients de service du backend
 
