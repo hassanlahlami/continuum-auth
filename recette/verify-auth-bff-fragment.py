@@ -136,7 +136,7 @@ def dg(cid, username, extra=None, secret=None):
 
 class Stop(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        if newurl.startswith((APP_CB, ADMIN_CB)):
+        if re.match(r"^http://localhost:\d+/api/auth/callback", newurl):
             raise urllib.error.HTTPError(newurl, code, "callback", headers, fp)
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
@@ -243,6 +243,17 @@ check(bool(cb and cb.get("code")), "login without acr_values -> password + OTP -
 if cb and cb.get("code"):
     _, _, b = exchange(ADMIN, ADMIN_CB, cb["code"], v); token_checks("admin code flow", b, "continuum-admin", "2", ADMIN)
     s, _, b = exchange(ADMIN, ADMIN_CB, cb["code"], v); check(s == 400, f"code replay refused -> {s}")
+# ADR 0014 addendum b: /authorize?app=admin and /step-up?app=admin&acr=2 send acr_values=2 to the admin client; the
+# BFF refreshes transparently, so the refreshed token must keep aud=continuum-admin and acr=2.
+for cbu in (ADMIN_CB, "http://localhost:4202/api/auth/callback"):
+    cb, page, v = code_flow(browser(), ADMIN, cbu, "dsi.admin", acr_values="2")
+    check(bool(cb and cb.get("code")), f"addendum b: acr_values=2 via {cbu} -> password + OTP -> code")
+    if cb and cb.get("code"):
+        _, _, b = exchange(ADMIN, cbu, cb["code"], v); token_checks("addendum b step-up", b, "continuum-admin", "2", ADMIN)
+        rt = json.loads(b).get("refresh_token")
+        _, _, b = req("POST", TE, {"grant_type": "refresh_token", "client_id": ADMIN, "client_secret": SECRET[ADMIN],
+                                   "refresh_token": rt})
+        token_checks("addendum b refreshed", b, "continuum-admin", "2", ADMIN)
 cb, page, v = code_flow(browser(), ADMIN, ADMIN_CB, "dsi.admin", otp_offset=-20)
 check(not (cb and cb.get("code")), "wrong OTP -> no code")
 cb, page, v = code_flow(browser(), ADMIN, ADMIN_CB, "auditor.nootp")
