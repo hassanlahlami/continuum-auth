@@ -190,7 +190,7 @@ def main():
                      "# Written by continuum-auth/scripts/sim-enroll-totp.py. Never paste values in chat, never commit.\n"
                      "# TOTP: SHA1, 6 digits, 30 s; Keycloak refuses a code reused in the same window (otpPolicyCodeReusable=false).\n"
                      "# otplib: authenticator.generate(SIM_TOTP_SECRET_BASE32)\n"
-                     "# Keycloak pages (cross-origin, cy.origin): inputs name=username, name=password, then name=otp; submit name=login.\n"
+                     "# Keycloak pages (driven by cy.request Code+PKCE, no cy.origin; HSTS ignored over http): inputs name=username, name=password, then name=otp; submit name=login.\n"
                      f"SIM_KC_URL={args.kc}\nSIM_KC_REALM={REALM}\nSIM_USERNAME={args.user}\n"
                      f"SIM_USER_PASSWORD={password}\nSIM_TOTP_SECRET_BASE32={b32}\n"
                      f"SIM_TOTP_SECRET_RAW={enrolled.decode()}\n")
