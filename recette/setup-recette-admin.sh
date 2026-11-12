@@ -4,6 +4,7 @@
 # acr=2 is a hard-coded claim mapper (same as banque-demo, DEV/RECETTE ONLY): simulates the MFA step-up
 # required by the backend (§4.3.3). In production the acr comes from a real step-up (OTP/WebAuthn).
 set -euo pipefail
+python -I "$(dirname "$0")/../scripts/guard-unmanaged-attribute-policy.py" >/dev/null
 KC="${KC_URL:-http://localhost:8180}"; REALM="${KC_REALM:-recette}"
 : "${RECETTE_DSI_ADMIN_PASSWORD:?set RECETTE_DSI_ADMIN_PASSWORD}"
 TENANT_ID="11111111-1111-1111-1111-111111111111"; ADMIN_UUID="33333333-3333-3333-3333-333333333333"
@@ -12,9 +13,14 @@ TOKEN="$(curl -s -d client_id=admin-cli -d username="${KC_ADMIN:-admin}" -d pass
 auth=(-H "Authorization: Bearer $TOKEN"); J=(-H "Content-Type: application/json")
 api() { curl -s -o /dev/null -w "   $1 -> %{http_code}\n" "${@:2}"; }
 
-echo "1) unmanaged attributes ENABLED"
-api profile -X PUT "${auth[@]}" "${J[@]}" "$KC/admin/realms/$REALM/users/profile" \
-  -d '{"unmanagedAttributePolicy":"ENABLED","attributes":[{"name":"username","permissions":{"view":["admin","user"],"edit":["admin","user"]}},{"name":"email","permissions":{"view":["admin","user"],"edit":["admin","user"]}},{"name":"firstName","permissions":{"view":["admin","user"],"edit":["admin","user"]}},{"name":"lastName","permissions":{"view":["admin","user"],"edit":["admin","user"]}}]}'
+echo "1) unmanaged attributes ADMIN_EDIT (admin read/write only)"
+# Read-modify-write of the user profile: keep the managed attributes as they are, change only the policy.
+# ENABLED is forbidden: users could self-edit tenant_id / continuum_user_id (token claims, §4.5).
+curl -s "${auth[@]}" "$KC/admin/realms/$REALM/users/profile" \
+  | python -c "import sys,json;d=json.load(sys.stdin);d['unmanagedAttributePolicy']='ADMIN_EDIT';print(json.dumps(d))" \
+  | curl -s -o /dev/null -w "   profile -> %{http_code}\n" -X PUT "${auth[@]}" "${J[@]}" "$KC/admin/realms/$REALM/users/profile" -d @-
+POLICY="$(curl -s "${auth[@]}" "$KC/admin/realms/$REALM/users/profile" | python -c "import sys,json;print(json.load(sys.stdin).get('unmanagedAttributePolicy',''))")"
+[ "$POLICY" = "ADMIN_EDIT" ] || { echo "abort: unmanagedAttributePolicy is '$POLICY', expected ADMIN_EDIT" >&2; exit 1; }
 
 echo "2) client continuum-admin"
 CID="$(curl -s "${auth[@]}" "$KC/admin/realms/$REALM/clients?clientId=continuum-admin" | python -c "import sys,json;L=json.load(sys.stdin);print(L[0]['id'] if L else '')")"

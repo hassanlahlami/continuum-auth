@@ -163,3 +163,14 @@ l'action relus ; utilisateur avec `CONFIGURE_TOTP` + bon mot de passe → 400 *A
 espacés (> quick-login) → encore actif, 5ᵉ → `attack-detection` `disabled:true` et bon mot de passe → 401
 `invalid_grant` ; verrou levé → 200. Vérifié 2026-11-03 sur Keycloak 26.3.5 jetable (realms `banque-demo` importé et
 `recette` vierge : avant application, `recette` = force brute désactivée, `failureFactor` 30).
+
+## Attributs non gérés du profil utilisateur (garde-fou §4.5)
+
+`unmanagedAttributePolicy` = **`ADMIN_EDIT`** dans tout realm recette/prod (lecture-modification-écriture de
+`/users/profile`) ; **`ENABLED` est interdit** : l'utilisateur pourrait modifier lui-même `tenant_id` /
+`continuum_user_id` (API account) et ces valeurs falsifiées arriveraient dans les jetons. Garde statique :
+`python -I scripts/guard-unmanaged-attribute-policy.py` (exécuté en tête des scripts `recette/`, abandon si un
+fichier du dépôt pose `ENABLED`). Preuve en direct : `KC_REALM=recette python -I recette/verify-unmanaged-attribute-policy.py`
+(utilisateur jetable ; `EXPECT=vulnerable` pour un contrôle sur un realm `ENABLED`). Vérifié le 2026-11-12 sur le
+realm `recette` de la simulation : avant correctif, auto-modification acceptée et `tenant_id` falsifié présent dans le
+jeton `continuum-admin` ; après, sans effet, claims `tenant_id` / `continuum_user_id` / `acr=2` / `aud` intacts.
