@@ -7,7 +7,7 @@ direct grant. Random secrets/passwords in memory only, never printed. Realm dele
 Usage: python -I recette/verify-auth-bff-fragment.py [REALM.json]
        (default REALM.json = ../Instructions/infra/simulation/keycloak/realms/banque-demo-realm.json)
 """
-import base64, hashlib, hmac, html, http.cookiejar, importlib.util, json, os, re, secrets, struct, sys, time
+import base64, hashlib, hmac, html, http.cookiejar, importlib.util, json, os, re, secrets, struct, subprocess, sys, time
 import urllib.error, urllib.parse, urllib.request
 
 KC = os.environ.get("KC_URL", "http://localhost:8180")
@@ -25,6 +25,9 @@ SECRET = {APP: secrets.token_urlsafe(32), ADMIN: secrets.token_urlsafe(32)}
 PASSWORD = "Ver1fy!" + secrets.token_urlsafe(16)
 SEED = "".join(secrets.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789") for _ in range(20))
 fails = []
+if subprocess.run([sys.executable, "-I", os.path.join(ROOT, "scripts", "guard-unmanaged-attribute-policy.py")],
+                  stdout=subprocess.DEVNULL).returncode:
+    sys.exit(1)
 
 
 def check(cond, label):
@@ -106,8 +109,11 @@ print(f"1) import merged realm -> {s}")
 if s != 201:
     sys.exit("import failed: " + b[:400])
 s, _, b = req("GET", f"{KC}/admin/realms/{REALM}/users/profile", headers=A)
-prof = json.loads(b); prof["unmanagedAttributePolicy"] = "ENABLED"
+prof = json.loads(b); prof["unmanagedAttributePolicy"] = "ADMIN_EDIT"  # never ENABLED (self-edit of tenant_id)
 req("PUT", f"{KC}/admin/realms/{REALM}/users/profile", prof, A)
+_, _, b = req("GET", f"{KC}/admin/realms/{REALM}/users/profile", headers=A)
+if json.loads(b).get("unmanagedAttributePolicy") != "ADMIN_EDIT":
+    sys.exit("abort: unmanagedAttributePolicy not ADMIN_EDIT")
 for u in ("dsi.admin", "auditor.nootp"):
     _, _, b = req("GET", f"{KC}/admin/realms/{REALM}/users?username={u}&exact=true", headers=A)
     rep = json.loads(b)[0]; rep["attributes"] = {"tenant_id": [TENANT], "continuum_user_id": [CUID]}
